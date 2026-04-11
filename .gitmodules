@@ -4,9 +4,6 @@
 [submodule "crowd-management-gateway"]
 	path = crowd-management-gateway
 	url = git@github.com:AzamatAbraev/crowd-management-gateway.git
-[submodule "iot-device-simulator"]
-	path = iot-device-simulator
-	url = git@github.com:AzamatAbraev/crowd-management-iot-simulator.git
 [submodule "people-counter-frontend"]
 	path = people-counter-frontend
 	url = git@github.com:AzamatAbraev/crowd-management-ui.git
