@@ -34,8 +34,8 @@ cd people-counter-frontend && docker compose up -d && cd ..
 
 echo "========================================="
 echo "All services started successfully!"
-echo "   Frontend: http://localhost:5173"
-echo "   Gateway:  http://localhost:8082"
-echo "   Keycloak: http://localhost:8080"
-echo "   Grafana:  http://localhost:3000"
+echo "   Frontend:     http://localhost:5173"
+echo "   Gateway:      http://localhost:8082"
+echo "   Keycloak:     http://localhost:8080"
+echo "   Grafana:      http://localhost:3000"
 echo "========================================="
