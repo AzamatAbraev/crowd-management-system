@@ -1,12 +1,12 @@
 [submodule "crowd-management-api"]
 	path = crowd-management-api
-	url = git@github.com:AzamatAbraev/crowd-management-api.git
+	url = https://github.com/AzamatAbraev/crowd-management-api.git
 [submodule "crowd-management-gateway"]
 	path = crowd-management-gateway
-	url = git@github.com:AzamatAbraev/crowd-management-gateway.git
+	url = https://github.com/AzamatAbraev/crowd-management-gateway.git
 [submodule "people-counter-frontend"]
 	path = people-counter-frontend
-	url = git@github.com:AzamatAbraev/crowd-management-ui.git
+	url = https://github.com/AzamatAbraev/crowd-management-ui.git
 [submodule "iot-simulator"]
 	path = iot-simulator
-	url = git@github.com:AzamatAbraev/crowd-management-iot-simulator.git
+	url = https://github.com/AzamatAbraev/crowd-management-iot-simulator.git
