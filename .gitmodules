@@ -10,3 +10,6 @@
 [submodule "people-counter-frontend"]
 	path = people-counter-frontend
 	url = git@github.com:AzamatAbraev/crowd-management-ui.git
+[submodule "iot-simulator"]
+	path = iot-simulator
+	url = git@github.com:AzamatAbraev/crowd-management-iot-simulator.git
