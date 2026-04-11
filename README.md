@@ -24,7 +24,7 @@ A real-time occupancy monitoring platform for university campuses. IoT sensors d
 ### Clone
 
 ```bash
-git clone --recurse-submodules git@github.com:AzamatAbraev/crowd-management-system.git
+git clone --recurse-submodules https://github.com/AzamatAbraev/crowd-management-system.git
 cd crowd-management-system
 ```
 
