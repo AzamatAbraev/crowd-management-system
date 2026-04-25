@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+venv_win/
+.venv/
+
+# YOLOv8 model weights (large binaries, download automatically on first run)
+*.pt
+*.onnx
+
+# Ultralytics cache
+runs/
+*.yaml.bak
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
