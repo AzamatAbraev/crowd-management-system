@@ -1,22 +1,21 @@
 """
-Line-crossing people counter — entrance/exit door mode.
+Line-crossing people counter — entrance/exit door or corridor/path mode.
 
-Camera looks at a doorway (ideally top-down or angled).
-A horizontal counting line is drawn across the frame at LINE_RATIO * frame_height.
+Supports two line orientations (LINE_ORIENTATION in config.py):
+
+  "horizontal" — line spans the full frame width (top-down doorway camera).
+      Zones: "above" / "below".  Entry direction: top_to_bottom or bottom_to_top.
+
+  "vertical"   — line spans the full frame height (side-view corridor camera).
+      Zones: "left" / "right".   Entry direction: left_to_right or right_to_left.
+
 YOLOv8 detects persons; ByteTrack assigns stable IDs across frames.
 When a tracked person's centroid crosses the line it triggers an entry or exit event
 and immediately publishes one MQTT telemetry message (delta = +1 or -1).
 
-State machine per track_id
-───────────────────────────
-  first seen below line  →  state = "below"  (no event)
-  first seen above line  →  state = "above"  (no event)
-  "above" → "below"      →  ENTRY event  (if ENTRY_DIRECTION = "top_to_bottom")
-  "below" → "above"      →  EXIT  event  (if ENTRY_DIRECTION = "top_to_bottom")
-
 A ±CROSSING_BUFFER pixel band around the line acts as hysteresis: while the centroid
 is inside the band the state does not change, preventing oscillation when someone
-pauses in the doorway.
+pauses at the line.
 """
 
 import logging
@@ -67,12 +66,15 @@ class LineCrossingCounter:
         if not cap.isOpened():
             raise RuntimeError(f"Cannot open camera {config.CAMERA_INDEX}")
 
+        vertical = (config.LINE_ORIENTATION == "vertical")
+
         # Discard the first several frames — camera sensor needs time to adjust exposure
         logger.info("Warming up camera …")
         for _ in range(20):
             cap.read()
 
-        logger.info("Line-crossing counter started  (press Q in preview window to quit)")
+        logger.info("Line-crossing counter started  orientation=%s  (press Q to quit)",
+                    config.LINE_ORIENTATION)
 
         try:
             while True:
@@ -81,15 +83,17 @@ class LineCrossingCounter:
                     time.sleep(0.05)
                     continue
 
-                h, w   = frame.shape[:2]
-                line_y = int(h * config.LINE_RATIO)
-                buf    = config.CROSSING_BUFFER
+                h, w = frame.shape[:2]
+                buf  = config.CROSSING_BUFFER
 
-                # Run detection + ByteTrack tracking
+                # Line position in pixels
+                line_x = int(w * config.LINE_RATIO) if vertical else None
+                line_y = int(h * config.LINE_RATIO) if not vertical else None
+
                 results = self.model.track(
                     frame,
                     persist=True,
-                    classes=[0],               # class 0 = person (COCO)
+                    classes=[0],
                     conf=config.CONFIDENCE,
                     tracker="bytetrack.yaml",
                     verbose=False,
@@ -105,35 +109,46 @@ class LineCrossingCounter:
                         cx, cy = _centroid(box)
                         active_ids.add(tid)
 
-                        # Resolve current zone (buffer band keeps previous state)
-                        if cy < line_y - buf:
-                            zone: str = "above"
-                        elif cy > line_y + buf:
-                            zone = "below"
+                        # Resolve zone — buffer band keeps the previous state (hysteresis)
+                        if vertical:
+                            if cx < line_x - buf:
+                                zone: str = "left"
+                            elif cx > line_x + buf:
+                                zone = "right"
+                            else:
+                                zone = self._states.get(tid, "left")
                         else:
-                            zone = self._states.get(tid, "above")  # stay put while in band
+                            if cy < line_y - buf:
+                                zone = "above"
+                            elif cy > line_y + buf:
+                                zone = "below"
+                            else:
+                                zone = self._states.get(tid, "above")
 
                         prev = self._states.get(tid)
                         if prev is not None and zone != prev:
                             self._on_crossing(tid, prev, zone)
                         self._states[tid] = zone
 
-                        # Draw bounding box + centroid
-                        color = _C_ABOVE if zone == "above" else _C_BELOW
+                        # Colour by zone
+                        if vertical:
+                            color = _C_ABOVE if zone == "left" else _C_BELOW
+                        else:
+                            color = _C_ABOVE if zone == "above" else _C_BELOW
+
                         x1, y1, x2, y2 = map(int, box)
                         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
                         cv2.circle(frame, (cx, cy), 5, color, -1)
                         cv2.putText(frame, f"ID {tid}", (x1, y1 - 8),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
 
-                # Remove state entries for tracks that have left the frame
                 for tid in list(self._states):
                     if tid not in active_ids:
                         del self._states[tid]
                         self._last_cross.pop(tid, None)
 
                 if config.SHOW_PREVIEW:
-                    self._draw_ui(frame, h, w, line_y, buf)
+                    self._draw_ui(frame, h, w, line_x, line_y, buf)
                     cv2.imshow(config.WINDOW_NAME, frame)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         break
@@ -153,10 +168,15 @@ class LineCrossingCounter:
 
         self._last_cross[tid] = now
 
-        if config.ENTRY_DIRECTION == "top_to_bottom":
+        direction = config.ENTRY_DIRECTION
+        if direction == "top_to_bottom":
             is_entry = (prev == "above" and curr == "below")
-        else:
+        elif direction == "bottom_to_top":
             is_entry = (prev == "below" and curr == "above")
+        elif direction == "left_to_right":
+            is_entry = (prev == "left" and curr == "right")
+        else:  # right_to_left
+            is_entry = (prev == "right" and curr == "left")
 
         if is_entry:
             self.entry_count += 1
@@ -169,21 +189,30 @@ class LineCrossingCounter:
 
     # ── Preview drawing ───────────────────────────────────────────────────────
 
-    def _draw_ui(self, frame, h, w, line_y, buf):
+    def _draw_ui(self, frame, h, w, line_x, line_y, buf):
         self._fps_buf.append(time.time())
         fps = 0.0
         if len(self._fps_buf) > 1:
             fps = (len(self._fps_buf) - 1) / (self._fps_buf[-1] - self._fps_buf[0])
 
-        # Counting line + hysteresis band
-        cv2.line(frame, (0, line_y),       (w, line_y),       _C_LINE,   2)
-        cv2.line(frame, (0, line_y - buf), (w, line_y - buf), _C_BUFFER, 1)
-        cv2.line(frame, (0, line_y + buf), (w, line_y + buf), _C_BUFFER, 1)
+        if config.LINE_ORIENTATION == "vertical":
+            # Vertical counting line + hysteresis band
+            cv2.line(frame, (line_x,       0), (line_x,       h), _C_LINE,   2)
+            cv2.line(frame, (line_x - buf, 0), (line_x - buf, h), _C_BUFFER, 1)
+            cv2.line(frame, (line_x + buf, 0), (line_x + buf, h), _C_BUFFER, 1)
 
-        # Direction arrow on the line
-        label = "↓ ENTRY" if config.ENTRY_DIRECTION == "top_to_bottom" else "↑ ENTRY"
-        cv2.putText(frame, label, (w // 2 - 45, line_y - 12),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, _C_LINE, 2)
+            label = "→ ENTRY" if config.ENTRY_DIRECTION == "left_to_right" else "← ENTRY"
+            cv2.putText(frame, label, (line_x + 8, h // 2),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, _C_LINE, 2)
+        else:
+            # Horizontal counting line + hysteresis band
+            cv2.line(frame, (0, line_y),       (w, line_y),       _C_LINE,   2)
+            cv2.line(frame, (0, line_y - buf), (w, line_y - buf), _C_BUFFER, 1)
+            cv2.line(frame, (0, line_y + buf), (w, line_y + buf), _C_BUFFER, 1)
+
+            label = "↓ ENTRY" if config.ENTRY_DIRECTION == "top_to_bottom" else "↑ ENTRY"
+            cv2.putText(frame, label, (w // 2 - 45, line_y - 12),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, _C_LINE, 2)
 
         # Semi-transparent stats panel
         panel = frame.copy()

@@ -13,25 +13,31 @@ BUILDING     = "library"
 FLOOR        = "floor_1"
 ROOM         = "entrance"        # logical label for the door/zone this camera watches
 
-# ── Camera ────────────────────────────────────────────────────────────────────
+# Camera
 CAMERA_INDEX = 0
 FRAME_WIDTH  = 640
 FRAME_HEIGHT = 480
 
-# ── Detection ─────────────────────────────────────────────────────────────────
+# Detection
 # yolov8n.pt = fastest (nano).  yolov8s.pt / yolov8m.pt = more accurate.
 # The model file is downloaded automatically on first run.
 YOLO_MODEL   = "yolov8s.pt"
 CONFIDENCE   = 0.40
 
-# ── Mode ──────────────────────────────────────────────────────────────────────
+# Mode
 # "line" — entrance door: counts entries/exits as people cross a virtual line
 # "room" — whole room:    estimates current occupancy from all visible people
 MODE = "room"
 
-# ── Line-crossing settings (used when MODE = "line") ─────────────────────────
-# LINE_RATIO: position of the counting line as a fraction of frame height.
-#   0.0 = very top of frame   |   1.0 = very bottom   |   0.5 = middle (default)
+# Line-crossing settings (used when MODE = "line")
+# LINE_ORIENTATION: orientation of the virtual counting line.
+#   "horizontal" — line spans the full width of the frame (doorway / top-down camera)
+#   "vertical"   — line spans the full height of the frame (corridor / side-view camera)
+LINE_ORIENTATION = "horizontal"
+
+# LINE_RATIO: position of the counting line as a fraction of the relevant dimension.
+#   horizontal: fraction of frame HEIGHT  (0.0 = top,  1.0 = bottom, 0.5 = middle)
+#   vertical:   fraction of frame WIDTH   (0.0 = left, 1.0 = right,  0.5 = middle)
 LINE_RATIO      = 0.5
 
 # Buffer band (pixels) around the line — person must be this far past the line
@@ -44,10 +50,14 @@ CROSSING_BUFFER = 25
 CROSS_COOLDOWN_S = 3.0
 
 # ENTRY_DIRECTION: which crossing direction counts as "entry".
-#   "top_to_bottom" — person moves from top half toward bottom half = entry
-#                     (use this when the corridor is at the top of the frame)
-#   "bottom_to_top" — person moves from bottom toward top = entry
-#                     (flip if your camera faces the other way)
+#
+#   For LINE_ORIENTATION = "horizontal":
+#     "top_to_bottom" — person moves from top toward bottom = entry
+#     "bottom_to_top" — person moves from bottom toward top = entry
+#
+#   For LINE_ORIENTATION = "vertical":
+#     "left_to_right" — person moves from left toward right = entry
+#     "right_to_left" — person moves from right toward left = entry
 ENTRY_DIRECTION = "top_to_bottom"
 
 # ── Room-occupancy settings (used when MODE = "room") ────────────────────────

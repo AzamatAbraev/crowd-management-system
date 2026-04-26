@@ -12,7 +12,7 @@ const char* ROOM       = "113";
 
 const char* WIFI_SSID   = "****";
 const char* WIFI_PASS   = "****";
-const char* MQTT_SERVER = "172.26.164.80";
+const char* MQTT_SERVER = "172.16.16.211"; //need to adjust ip accordingly
 const int   MQTT_PORT   = 1883;
 
 char topicTelemetry[128];
